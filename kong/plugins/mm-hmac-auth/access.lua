@@ -54,9 +54,8 @@ end
 
 local function validate_signature(request, secret, signature, algorithm, defaultClockSkew)
   local method = request.get_method()
-  local methodsWithContentType = {"POST", "DELETE", "PATCH", "PUT" }
   local contentType = ""
-  if methodsWithContentType[method] then
+  if method == "POST" or method == "DELETE" or method == "PATCH" or method == "PUT" then
       local tempContentType = request.get_headers()["Content-Type"]
       if tempContentType then
           contentType = tempContentType
