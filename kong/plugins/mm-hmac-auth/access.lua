@@ -59,6 +59,9 @@ local function validate_signature(request, secret, signature, algorithm, default
   if not contentType then
     contentType = ""
   end
+  if method == "GET" then
+      contentType = ""
+  end
   local path = ngx.var.uri
   request.read_body()
   local body = request.get_body_data()
