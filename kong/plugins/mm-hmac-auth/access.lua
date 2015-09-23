@@ -53,14 +53,14 @@ local function retrieve_hmac_fields(request, header_name, conf)
 end
 
 local function validate_signature(request, secret, signature, algorithm, defaultClockSkew)
-  -- validate clock skew
   local method = request.get_method()
-  local contentType = request.get_headers()["Content-Type"]
-  if not contentType then
-    contentType = ""
-  end
-  if method == "GET" then
-      contentType = ""
+  local methodsWithContentType = {"POST", "DELETE", "PATCH", "PUT" }
+  local contentType = ""
+  if methodsWithContentType[method] then
+      local tempContentType = request.get_headers()["Content-Type"]
+      if tempContentType then
+          contentType = tempContentType
+      end
   end
   local path = ngx.var.uri
   request.read_body()
@@ -83,10 +83,7 @@ local function validate_signature(request, secret, signature, algorithm, default
   ngx.log(ngx.ERR, "MM: String to sign: "..stringToSign)
   -- validate signature
   local digest = ngx_sha1(secret.secret, stringToSign)
-  ngx.log(ngx.ERR, "MM: Digest: "..ngx_encode_base64(digest))
-  ngx.log(ngx.ERR, "MM: Signature: "..ngx_encode_base64(signature))
   if digest then
-    ngx.log(ngx.ERR, "MM: Comparing....")
     return ngx_encode_base64(digest) == ngx_encode_base64(signature)
   end
 end
@@ -99,7 +96,6 @@ local function load_secret(username)
   local secret
   if username then
       secret = cache.get_or_set(hmacauth_credential_key(username), function()
-      ngx.log(ngx.ERR, "MM: KEY NOT FOUND")
       local keys, err = dao.mm_hmacauth_credentials:find_by_keys { username = username }
       local result
       if err then
@@ -125,11 +121,11 @@ function _M.execute(conf)
   if not (username and signature) then
     responses.send_HTTP_FORBIDDEN(SIGNATURE_NOT_VALID)
   end
-  ngx.log(ngx.ERR, "MM: Username "..username)
-  ngx.log(ngx.ERR, "MM: Signature "..signature)
-  ngx.log(ngx.ERR, "MM: Algorithm "..algorithm)
 
   local secret = load_secret(username)
+  if not secret then
+      responses.send_HTTP_UNAUTHORIZED("API Key not found")
+  end
 
   if not validate_signature(ngx.req, secret, signature, algorithm, conf.clock_skew) then
     ngx.ctx.stop_phases = true -- interrupt other phases of this request
